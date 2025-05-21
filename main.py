@@ -4,6 +4,27 @@ from sheets import connect_to_sheet
 from datetime import datetime
 import asyncio
 
+from flask import Flask
+import threading
+
+# Фейковый веб-сервер для Render
+fake_app = Flask(__name__)
+
+@fake_app.route('/')
+def home():
+    return "Bot is running!"
+
+# Запускаем Flask в отдельном потоке
+# Запускаем Flask в отдельном потоке
+def run_flask():
+    import os
+    port = int(os.environ.get("PORT", 10000))  # Render сам подставит переменную PORT
+    fake_app.run(host="0.0.0.0", port=port)
+
+# Запуск потока Flask
+threading.Thread(target=run_flask).start()
+
+
 already_notified = set()
 
 # Connect to Google Sheet
