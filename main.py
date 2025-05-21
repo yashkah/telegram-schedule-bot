@@ -1,0 +1,115 @@
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from sheets import connect_to_sheet
+from datetime import datetime
+import asyncio
+
+already_notified = set()
+
+# Connect to Google Sheet
+sheet = connect_to_sheet()
+
+# /start command
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Hello! Send /nextlesson to see your upcoming class 📚")
+
+# /nextlesson command
+async def nextlesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    now = datetime.now()
+    data = sheet.get_all_records()
+
+    for row in data:
+        if str(row["Telegram_ID"]) == user_id:
+            try:
+                dt = datetime.strptime(f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M:%S")
+            except ValueError:
+                try:
+                    dt = datetime.strptime(f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M")
+                except:
+                    continue
+
+            if dt > now:
+                message = (
+                     f"📅 Your next lesson:\n\n"
+                     f"🗓️ Date: {row['Day']}, {row['Date']}\n"
+                     f"⏰ Time: {row['Time']}\n"
+                     f"📚 Subject: {row['Subject']}"
+)
+                await update.message.reply_text(message)
+
+                return
+
+    await update.message.reply_text("You don't have any upcoming lessons 🤷")
+
+# BotFather token here
+TOKEN = "7840640138:AAGuY61G9cZ6MeTuPinIIy0DNyqzvZntTYs"
+
+app = ApplicationBuilder().token(TOKEN).build()
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("nextlesson", nextlesson))
+
+import schedule
+import time
+import threading
+import asyncio
+
+async def send_reminders(application):
+    now = datetime.now()
+    data = sheet.get_all_records()
+
+    for row in data:
+        print(f"🧪 Checking row for student: {row['Student']} | Date: {row['Date']} | Time: {row['Time']}")
+        lesson_key = f"{row['Telegram_ID']}_{row['Date']}_{row['Time']}"
+
+        if lesson_key in already_notified:
+            print(f"⚠️ Already notified for: {lesson_key}")
+            continue
+        try:
+            dt = datetime.strptime(f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M")
+            if dt < now:
+                continue
+
+        except:
+            print("⚠️ Could not parse datetime.")
+            continue
+
+        time_diff = (dt - now).total_seconds() / 60
+        print(f"⏳ Time diff with now: {time_diff:.2f} minutes")
+
+        REMINDER_BEFORE_MINUTES = 60
+
+        if REMINDER_BEFORE_MINUTES - 0.5 <= time_diff <= REMINDER_BEFORE_MINUTES + 0.5:
+            print(f"✅ Sending reminder to: {row['Student']}")
+            user_id = int(row["Telegram_ID"])
+            message = (
+                f"⏰ Reminder: Your lesson starts in 1 hour!\n\n"
+                f"📅 Date: {row['Day']}, {row['Date']}\n"
+                f"⏰ Time: {row['Time']}\n"
+                f"📚 Subject: {row['Subject']}"
+)
+
+            try:
+                await application.bot.send_message(chat_id=user_id, text=message)
+                already_notified.add(lesson_key)
+            except Exception as e:
+                print(f"❌ Failed to send message to {user_id}: {e}")
+
+def run_schedule(application):
+    async def task():
+        await send_reminders(application)
+
+    def loop():
+        schedule.every(1).minutes.do(lambda: asyncio.run(task()))
+        while True:
+            schedule.run_pending()
+            time.sleep(1)
+
+    thread = threading.Thread(target=loop)
+    thread.daemon = True
+    thread.start()
+
+if __name__ == "__main__":
+    print("Bot is running...")
+    run_schedule(app)
+    app.run_polling()
