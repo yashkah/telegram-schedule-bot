@@ -43,7 +43,13 @@ async def nextlesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("You don't have any upcoming lessons 🤷")
 
 # BotFather token here
-TOKEN = "7840640138:AAGuY61G9cZ6MeTuPinIIy0DNyqzvZntTYs"
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+TOKEN = os.getenv("BOT_TOKEN")
+
 
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
