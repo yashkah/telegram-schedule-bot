@@ -45,10 +45,14 @@ async def nextlesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # BotFather token here
 import os
 
-from dotenv import load_dotenv
-
-load_dotenv()
-TOKEN = os.getenv("BOT_TOKEN")
+# Try to load from dotenv if available, otherwise use os.environ directly
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    TOKEN = os.getenv("BOT_TOKEN")
+except ImportError:
+    # If dotenv is not available, use os.environ directly
+    TOKEN = os.environ["BOT_TOKEN"]
 
 
 app = ApplicationBuilder().token(TOKEN).build()
