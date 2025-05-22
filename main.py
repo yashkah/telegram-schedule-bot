@@ -142,14 +142,12 @@ def run_schedule(application):
 
 print("Bot is starting...")
 
-# Запускаем напоминания (schedule) сразу
+# Запускаем напоминания
 run_schedule(app)
 
-# Запускаем Telegram-бота (polling)
+# Запускаем Telegram-бота
 async def run_bot():
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling()
-    print("Bot is running and polling...")
+    await app.run_polling()
 
 asyncio.run(run_bot())
+
