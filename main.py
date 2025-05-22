@@ -14,7 +14,7 @@ fake_app = Flask(__name__)
 def home():
     return "Bot is running!"
 
-# Запускаем Flask в отдельном потоке
+
 # Запускаем Flask в отдельном потоке
 def run_flask():
     import os
@@ -140,7 +140,16 @@ def run_schedule(application):
     thread.daemon = True
     thread.start()
 
-if __name__ == "__main__":
-    print("Bot is running...")
-    run_schedule(app)
-    app.run_polling()
+print("Bot is starting...")
+
+# Запускаем напоминания (schedule) сразу
+run_schedule(app)
+
+# Запускаем Telegram-бота (polling)
+async def run_bot():
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+    print("Bot is running and polling...")
+
+asyncio.run(run_bot())
