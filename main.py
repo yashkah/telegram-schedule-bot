@@ -140,6 +140,9 @@ def run_schedule(application):
     thread.daemon = True
     thread.start()
 
+import nest_asyncio
+nest_asyncio.apply()
+
 print("Bot is starting...")
 
 # Запускаем напоминания
@@ -149,5 +152,4 @@ run_schedule(app)
 async def run_bot():
     await app.run_polling()
 
-asyncio.run(run_bot())
-
+asyncio.get_event_loop().run_until_complete(run_bot())
