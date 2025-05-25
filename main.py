@@ -52,7 +52,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "▫️ /nextlesson — Show your upcoming lesson\n"
         "▫️ /cancel — Cancel your next class (coming soon)\n"
         "▫️ /reschedule — Reschedule your class (coming soon)\n"
-        "▫️ /profile — View your profile info (coming soon)\n\n"
+        "▫️ /profile — View your profile info\n"
         "💡 Just type one of the commands above or send me a message to interact!"
     )
     
@@ -90,6 +90,33 @@ async def nextlesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("You don't have any upcoming lessons 🤷")
 
+async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    sheets = connect_to_sheet()
+    users_sheet = sheets["users"]
+    data = users_sheet.get_all_records()
+
+    for row in data:
+        if str(row["Telegram ID"]) == user_id:
+            level = row.get("Level", "Not set")
+            experience = row.get("Experience", "Not set")
+            goal = row.get("Goal", "Not set")
+
+            message = (
+                f"👤 *Your Profile:*\n\n"
+                f"📛 Name: {row['Name']}\n"
+                f"💬 Username: @{row['Username']}\n"
+                f"🆔 Telegram ID: {row['Telegram ID']}\n"
+                f"🧠 Level: {level}\n"
+                f"📈 Experience: {experience}\n"
+                f"🎯 Goal: {goal}\n"
+                f"🕒 Last Active: {row['Log Date']}"
+            )
+            await update.message.reply_text(message, parse_mode='Markdown')
+            return
+
+    await update.message.reply_text("❌ Profile not found. Please try again later.")
+
 
 # BotFather token here
 import os
@@ -107,6 +134,7 @@ except ImportError:
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("nextlesson", nextlesson))
+app.add_handler(CommandHandler("profile", profile))
 
 from telegram.ext import MessageHandler, filters
 
