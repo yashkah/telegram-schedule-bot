@@ -52,7 +52,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def nextlesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     now = datetime.now()
-    data = sheet.get_all_records()
+
+    sheets = connect_to_sheet()
+    schedule_sheet = sheets["schedule"]
+    data = schedule_sheet.get_all_records()
 
     for row in data:
         if str(row["Telegram_ID"]) == user_id:
@@ -70,12 +73,12 @@ async def nextlesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
                      f"🗓️ Date: {row['Day']}, {row['Date']}\n"
                      f"⏰ Time: {row['Time']}\n"
                      f"📚 Subject: {row['Subject']}"
-)
+                )
                 await update.message.reply_text(message)
-
                 return
 
     await update.message.reply_text("You don't have any upcoming lessons 🤷")
+
 
 # BotFather token here
 import os
