@@ -38,7 +38,7 @@ def save_user_to_users_sheet(name, username, telegram_id, timestamp):
     existing_ids = [str(row["Telegram ID"]) for row in data]
 
     if str(telegram_id) not in existing_ids:
-        users_sheet.append_row([name, username, telegram_id, timestamp])
+        users_sheet.append_row([name, username, telegram_id, timestamp, "", "", ""])
         print(f"✅ New user saved: {name} (ID: {telegram_id})")
     else:
         print(f"👀 User already exists: {telegram_id}")
@@ -110,7 +110,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"🧠 Level: {level}\n"
                 f"📈 Experience: {experience}\n"
                 f"🎯 Goal: {goal}\n"
-                f"🕒 Last Active: {row['Log Date']}"
+                f"🕒 Register Date: {row['Log Date']}"
             )
             await update.message.reply_text(message, parse_mode='Markdown')
             return
