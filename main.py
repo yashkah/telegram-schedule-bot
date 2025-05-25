@@ -110,17 +110,13 @@ async def log_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     print(f"💬 Message from {name} (@{username}, ID: {user_id}) at {timestamp}: {message}")
 
-    # Save to Google Sheets if not already saved
     save_user_to_users_sheet(name, username, user_id, timestamp)
 
-# Attach this to the bot
 app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), log_message))
-
 
 import schedule
 import time
 import threading
-import asyncio
 
 async def send_reminders(application):
     now = datetime.now()
