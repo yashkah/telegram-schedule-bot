@@ -50,7 +50,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👋 *Hello! I'm your personal lesson assistant bot!*\n\n"
         "Here’s what I can do for you:\n"
         "▫️ /nextlesson — Show your upcoming lesson\n"
-        "▫️ /cancel — Cancel your next class (coming soon)\n"
+        "▫️ /cancel — Cancel your next class\n"
         "▫️ /reschedule — Reschedule your class (coming soon)\n"
         "▫️ /profile — View your profile info\n"
         "💡 Just type one of the commands above or send me a message to interact!"
@@ -89,6 +89,33 @@ async def nextlesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
 
     await update.message.reply_text("You don't have any upcoming lessons 🤷")
+
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    now = datetime.now()
+
+    sheets = connect_to_sheet()
+    schedule_sheet = sheets["schedule"]
+    data = schedule_sheet.get_all_records()
+
+    for index, row in enumerate(data, start=2):  # начинаем с 2, т.к. первая строка — заголовок
+        if str(row["Telegram_ID"]) == user_id:
+            try:
+                dt = datetime.strptime(f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M")
+            except:
+                continue
+
+            if dt > now:
+                # Удаляем строку в Google Sheets
+                schedule_sheet.delete_rows(index)
+                await update.message.reply_text(
+                    f"❌ Your lesson on {row['Date']} at {row['Time']} has been *cancelled*.",
+                    parse_mode='Markdown'
+                )
+                return
+
+    await update.message.reply_text("📭 You don’t have any upcoming lessons to cancel.")
+
 
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -135,6 +162,7 @@ app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("nextlesson", nextlesson))
 app.add_handler(CommandHandler("profile", profile))
+app.add_handler(CommandHandler("cancel", cancel))
 
 from telegram.ext import MessageHandler, filters
 
