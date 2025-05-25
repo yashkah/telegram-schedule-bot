@@ -112,10 +112,11 @@ async def nextlesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"📝 *Comment:* {row.get('Comments', 'No comment')}"
                 )
 
-                await update.message.reply_text(message)
+                await update.message.reply_text(message, parse_mode="Markdown")
                 return
 
     await update.message.reply_text("You don't have any upcoming lessons 🤷")
+    return
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -437,7 +438,7 @@ def run_schedule(application):
     def loop():
         schedule.every(1).minutes.do(lambda: asyncio.run(task()))
         while True:
-            schedule.run_pending()
+            schedule.run_pending() 
             time.sleep(1)
 
     thread = threading.Thread(target=loop)
