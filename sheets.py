@@ -9,10 +9,10 @@ def connect_to_sheet():
     creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
     client = gspread.authorize(creds)
 
-    # Открываем таблицу по названию
     spreadsheet = client.open("English Schedule")
 
     return {
-        "schedule": spreadsheet.worksheet("May 25"),  # Название листа с занятиями
-        "users": spreadsheet.worksheet("Users")         # Название листа для студентов
+        "schedule": spreadsheet.worksheet("May 25"),
+        "users": spreadsheet.worksheet("Users"),
+        "slots": spreadsheet.worksheet("Slots")
     }
