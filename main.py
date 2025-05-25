@@ -106,7 +106,7 @@ async def log_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = f"{user.first_name or ''} {user.last_name or ''}".strip()
     username = user.username or "-"
     user_id = user.id
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now().strftime("%Y.%m.%d")  
 
     print(f"💬 Message from {name} (@{username}, ID: {user_id}) at {timestamp}: {message}")
 
@@ -120,7 +120,10 @@ import threading
 
 async def send_reminders(application):
     now = datetime.now()
-    data = sheet.get_all_records()
+    sheets = connect_to_sheet()
+    schedule_sheet = sheets["schedule"]
+    data = schedule_sheet.get_all_records()
+
 
     for row in data:
         print(f"🧪 Checking row for student: {row['Student']} | Date: {row['Date']} | Time: {row['Time']}")
