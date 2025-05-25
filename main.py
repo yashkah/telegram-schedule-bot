@@ -80,7 +80,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def nextlesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show user's next scheduled lesson."""
     user_id = str(update.effective_user.id)
     now = datetime.now()
 
@@ -91,25 +90,24 @@ async def nextlesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for row in data:
         if str(row["Telegram_ID"]) == user_id:
             try:
-                dt = datetime.strptime(
-                    f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M:%S"
-                )
+                dt = datetime.strptime(f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M:%S")
             except ValueError:
                 try:
-                    dt = datetime.strptime(
-                        f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M"
-                    )
+                    dt = datetime.strptime(f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M")
                 except ValueError:
                     continue
 
             if dt > now:
+                lesson_type = row.get("Type") or row.get(" Type") or "Not set"
+                comment = row.get("Comments") or row.get(" Comments") or "No comment"
+
                 message = (
                     f"📅 *Your Next Lesson:*\n\n"
                     f"🗓️ *Date:* {row['Day']}, {row['Date']}\n"
                     f"⏰ *Time:* {row['Time']}\n"
                     f"📚 *Subject:* {row['Subject']}\n"
-                    f"🧑‍💻 *Type:* {row.get('Type', 'Not set')}\n"
-                    f"📝 *Comment:* {row.get('Comments', 'No comment')}"
+                    f"🧑‍💻 *Type:* {lesson_type}\n"
+                    f"📝 *Comment:* {comment}"
                 )
 
                 await update.message.reply_text(message, parse_mode="Markdown")
@@ -117,6 +115,7 @@ async def nextlesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("You don't have any upcoming lessons 🤷")
     return
+
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -137,10 +136,13 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if dt > now:
                 schedule_sheet.delete_rows(index)
-                await update.message.reply_text(
-                    f"❌ Your lesson on {row['Date']} at {row['Time']} has been *cancelled*.",
-                    parse_mode="Markdown",
+                message = (
+                    f"❌ *Lesson Cancelled:*\n\n"
+                    f"🗓️ *Date:* {row['Date']}\n"
+                    f"⏰ *Time:* {row['Time']}"
                 )
+                await update.message.reply_text(message, parse_mode="Markdown")
+
                 return
 
     await update.message.reply_text("📭 You don't have any upcoming lessons to cancel.")
@@ -221,7 +223,12 @@ async def reschedule_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
         choice = int(user_input)
         selected_slot = user_slot_options[user_id][choice - 1]
     except (ValueError, IndexError):
-        await update.message.reply_text("❌ Invalid choice. Please enter a number from the list.")
+        message = (
+            f"✅ *Lesson Rescheduled:*\n\n"
+            f"🗓️ *New Date:* {selected_slot['Date']}\n"
+            f"⏰ *New Time:* {selected_slot['Time']}"
+        )
+        await update.message.reply_text(message, parse_mode="Markdown")
         return RESCHEDULE_SELECT
 
     sheets = connect_to_sheet()
@@ -310,13 +317,13 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             message = (
                 f"👤 *Your Profile:*\n\n"
-                f"📛 Name: {row['Name']}\n"
-                f"💬 Username: @{row['Username']}\n"
-                f"🆔 Telegram ID: {row['Telegram ID']}\n"
-                f"🧠 Level: {level}\n"
-                f"📈 Experience: {experience}\n"
-                f"🎯 Goal: {goal}\n"
-                f"🕒 Register Date: {row['Log Date']}"
+                f"📛 *Name:* {row['Name']}\n"
+                f"💬 *Username:* @{row['Username']}\n"
+                f"🆔 *Telegram ID:* {row['Telegram ID']}\n"
+                f"🧠 *Level:* {level}\n"
+                f"📈 *Experience:* {experience}\n"
+                f"🎯 *Goal:* {goal}\n"
+                f"🕒 *Register Date:* {row['Log Date']}"
             )
             await update.message.reply_text(message, parse_mode="Markdown")
             return
