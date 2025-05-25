@@ -13,32 +13,43 @@ from datetime import datetime
 import nest_asyncio
 from flask import Flask
 from telegram import Update
-from telegram.ext import (ApplicationBuilder, CommandHandler, ContextTypes,
-                         ConversationHandler, MessageHandler, filters)
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
+    ConversationHandler,
+    MessageHandler,
+    filters,
+)
+from dotenv import load_dotenv
 
 from sheets import connect_to_sheet
 
 # Flask server for Render hosting
-fake_app = Flask(__name__)
+app = Flask(__name__)
 
-@fake_app.route('/')
+
+@app.route("/")
 def home():
+    """Handle root route."""
     return "Bot is running!"
 
 
-# Запускаем Flask в отдельном потоке
 def run_flask():
     """Run Flask server in separate thread."""
     port = int(os.environ.get("PORT", 10000))
-    fake_app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port)
 
-# Запуск потока Flask
+
+# Start Flask thread
 threading.Thread(target=run_flask).start()
 
 already_notified = set()
 
 # Connect to Google Sheet
 sheet = connect_to_sheet()
+ADMIN_ID = 6878992518
+
 
 def save_user_to_users_sheet(name, username, telegram_id, timestamp):
     """Save new user info to Users worksheet."""
@@ -52,10 +63,8 @@ def save_user_to_users_sheet(name, username, telegram_id, timestamp):
         users_sheet.append_row([name, username, telegram_id, timestamp, "", "", ""])
         print(f"✅ New user saved: {name} (ID: {telegram_id})")
     else:
-        print(f"👀 User already exists: {telegram_id}")
-
-
-# /start command
+        print(f"👀 User already exists: {telegram_id}"
+        )
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command."""
     welcome_message = (
@@ -67,10 +76,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "▫️ /profile — View your profile info\n"
         "💡 Just type one of the commands above or send me a message to interact!"
     )
-    await update.message.reply_text(welcome_message, parse_mode='Markdown')
+    await update.message.reply_text(welcome_message, parse_mode="Markdown")
 
 
-# /nextlesson command
 async def nextlesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show user's next scheduled lesson."""
     user_id = str(update.effective_user.id)
@@ -83,26 +91,33 @@ async def nextlesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for row in data:
         if str(row["Telegram_ID"]) == user_id:
             try:
-                dt = datetime.strptime(f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M:%S")
+                dt = datetime.strptime(
+                    f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M:%S"
+                )
             except ValueError:
                 try:
-                    dt = datetime.strptime(f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M")
+                    dt = datetime.strptime(
+                        f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M"
+                    )
                 except ValueError:
                     continue
 
             if dt > now:
                 message = (
-                    f"📅 Your next lesson:\n\n"
-                    f"🗓️ Date: {row['Day']}, {row['Date']}\n"
-                    f"⏰ Time: {row['Time']}\n"
-                    f"📚 Subject: {row['Subject']}"
+                    f"📅 *Your Next Lesson:*\n\n"
+                    f"🗓️ *Date:* {row['Day']}, {row['Date']}\n"
+                    f"⏰ *Time:* {row['Time']}\n"
+                    f"📚 *Subject:* {row['Subject']}\n"
+                    f"🧑‍💻 *Type:* {row.get('Type', 'Not set')}\n"
+                    f"📝 *Comment:* {row.get('Comments', 'No comment')}"
                 )
+
                 await update.message.reply_text(message)
                 return
 
     await update.message.reply_text("You don't have any upcoming lessons 🤷")
 
-# /cancel command
+
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancel user's next scheduled lesson."""
     user_id = str(update.effective_user.id)
@@ -120,20 +135,21 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 continue
 
             if dt > now:
-                # Удаляем строку в Google Sheets
                 schedule_sheet.delete_rows(index)
                 await update.message.reply_text(
                     f"❌ Your lesson on {row['Date']} at {row['Time']} has been *cancelled*.",
-                    parse_mode='Markdown'
+                    parse_mode="Markdown",
                 )
                 return
 
     await update.message.reply_text("📭 You don't have any upcoming lessons to cancel.")
 
+
 RESCHEDULE_SELECT = range(1)
 
-# Сохраняем слоты в память на время выбора
+# Store slots in memory during selection
 user_slot_options = {}
+
 
 async def reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start lesson rescheduling process."""
@@ -142,7 +158,7 @@ async def reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     slots_sheet = sheets["slots"]
     schedule_sheet = sheets["schedule"]
 
-    # Получаем ближайший урок
+    # Get next lesson
     data = schedule_sheet.get_all_records()
     now = datetime.now()
     upcoming_lesson_row = None
@@ -158,10 +174,12 @@ async def reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 continue
 
     if not upcoming_lesson_row:
-        await update.message.reply_text("❌ You don't have any upcoming lessons to reschedule.")
+        await update.message.reply_text(
+            "❌ You don't have any upcoming lessons to reschedule."
+        )
         return ConversationHandler.END
 
-    # Получаем свободные слоты
+    # Get available slots
     slots_data = slots_sheet.get_all_records()
     available = []
     for slot in slots_data:
@@ -177,9 +195,9 @@ async def reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📭 No available time slots right now.")
         return ConversationHandler.END
 
-    # Показываем 5 первых слотов
+    # Show top 5 slots
     top_slots = available[:5]
-    user_slot_options[user_id] = top_slots  # сохраняем для обработки выбора
+    user_slot_options[user_id] = top_slots
 
     message = "🕒 Choose a new time slot by number:\n\n"
     for i, slot in enumerate(top_slots, start=1):
@@ -187,6 +205,7 @@ async def reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(message)
     return RESCHEDULE_SELECT
+
 
 async def reschedule_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle time slot selection for rescheduling."""
@@ -208,10 +227,10 @@ async def reschedule_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     slots_sheet = sheets["slots"]
     schedule_sheet = sheets["schedule"]
 
-    # 1. Удаляем старый урок
+    # 1. Delete old lesson
     data = schedule_sheet.get_all_records()
     old_date = old_time = old_comment = ""
-    
+
     for index, row in enumerate(data, start=2):
         if str(row["Telegram_ID"]) == user_id:
             try:
@@ -225,34 +244,43 @@ async def reschedule_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except ValueError:
                 continue
 
-
-    # 2. Add new lesson to the schedule
+    # 2. Add new lesson to schedule
     user = update.effective_user
     reschedule_note = f"Rescheduled from {old_date} at {old_time}"
-    combined_comment = f"{old_comment} | {reschedule_note}" if old_comment else reschedule_note
+    combined_comment = (
+        f"{old_comment} | {reschedule_note}" if old_comment else reschedule_note
+    )
 
     # Find first empty row
     next_row = len(schedule_sheet.get_all_values()) + 1
 
     # Insert data into specific cells
-    schedule_sheet.update(f"A{next_row}:K{next_row}", [[
-        selected_slot["Date"],
-        datetime.strptime(selected_slot["Date"], "%d.%m.%Y").strftime("%A"),
-        selected_slot["Time"],
-        user.first_name,
-        "English",
-        "60",
-        user_id,
-        "",
-        combined_comment,
-        "Online",
-        ""
-    ]])
+    schedule_sheet.update(
+        f"A{next_row}:K{next_row}",
+        [
+            [
+                selected_slot["Date"],
+                datetime.strptime(selected_slot["Date"], "%d.%m.%Y").strftime("%A"),
+                selected_slot["Time"],
+                user.first_name,
+                "English",
+                "60",
+                user_id,
+                "",
+                combined_comment,
+                "Online",
+                "",
+            ]
+        ],
+    )
 
     # 3. Update slot as booked
     slots_data = slots_sheet.get_all_records()
     for index, slot in enumerate(slots_data, start=2):
-        if slot["Date"] == selected_slot["Date"] and slot["Time"] == selected_slot["Time"]:
+        if (
+            slot["Date"] == selected_slot["Date"]
+            and slot["Time"] == selected_slot["Time"]
+        ):
             slots_sheet.update(f"C{index}", "TRUE")  # Booked
             slots_sheet.update(f"D{index}", user.first_name)  # Student
             slots_sheet.update(f"E{index}", user_id)  # Telegram ID
@@ -264,6 +292,7 @@ async def reschedule_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_slot_options.pop(user_id, None)
     return ConversationHandler.END
+
 
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show user profile information."""
@@ -288,18 +317,14 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"🎯 Goal: {goal}\n"
                 f"🕒 Register Date: {row['Log Date']}"
             )
-            await update.message.reply_text(message, parse_mode='Markdown')
+            await update.message.reply_text(message, parse_mode="Markdown")
             return
 
     await update.message.reply_text("❌ Profile not found. Please try again later.")
 
 
-# BotFather token here
-import os
-
-# Try to load from dotenv if available, otherwise use os.environ directly
+# Load environment variables
 try:
-    from dotenv import load_dotenv
     load_dotenv()
     TOKEN = os.getenv("BOT_TOKEN")
 except ImportError:
@@ -310,11 +335,18 @@ app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("nextlesson", nextlesson))
 app.add_handler(CommandHandler("profile", profile))
 app.add_handler(CommandHandler("cancel", cancel))
-app.add_handler(ConversationHandler(
-    entry_points=[CommandHandler("reschedule", reschedule)],
-    states={RESCHEDULE_SELECT: [MessageHandler(filters.TEXT & (~filters.COMMAND), reschedule_select)]},
-    fallbacks=[]
-))
+app.add_handler(
+    ConversationHandler(
+        entry_points=[CommandHandler("reschedule", reschedule)],
+        states={
+            RESCHEDULE_SELECT: [
+                MessageHandler(filters.TEXT & (~filters.COMMAND), reschedule_select)
+            ]
+        },
+        fallbacks=[],
+    )
+)
+
 
 async def log_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Log user messages and save new users."""
@@ -329,7 +361,25 @@ async def log_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"💬 Message from {name} (@{username}, ID: {user_id}) at {timestamp}: {message}")
     save_user_to_users_sheet(name, username, user_id, timestamp)
 
+    if user_id != ADMIN_ID:  # Don't send to self
+        notify_text = (
+            f"📨 *New message from student:*\n"
+            f"👤 Name: {name}\n"
+            f"💬 Username: @{username}\n"
+            f"🆔 ID: {user_id}\n"
+            f"🕒 Time: {timestamp}\n\n"
+            f"✉️ Message:\n{message}"
+        )
+        try:
+            await context.bot.send_message(
+                chat_id=ADMIN_ID, text=notify_text, parse_mode="Markdown"
+            )
+        except Exception as e:
+            print(f"❌ Failed to notify admin: {e}")
+
+
 app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), log_message))
+
 
 async def send_reminders(application):
     """Send lesson reminders to users."""
@@ -341,7 +391,9 @@ async def send_reminders(application):
     REMINDER_BEFORE_MINUTES = 60
 
     for row in data:
-        print(f"🧪 Checking row for student: {row['Student']} | Date: {row['Date']} | Time: {row['Time']}")
+        print(
+            f"🧪 Checking row for student: {row['Student']} | Date: {row['Date']} | Time: {row['Time']}"
+        )
         lesson_key = f"{row['Telegram_ID']}_{row['Date']}_{row['Time']}"
 
         if lesson_key in already_notified:
@@ -375,8 +427,10 @@ async def send_reminders(application):
             except Exception as e:
                 print(f"❌ Failed to send message to {user_id}: {e}")
 
+
 def run_schedule(application):
     """Run scheduled reminder checks."""
+
     async def task():
         await send_reminders(application)
 
@@ -390,16 +444,19 @@ def run_schedule(application):
     thread.daemon = True
     thread.start()
 
+
 nest_asyncio.apply()
 
 print("Bot is starting...")
 
-# Запускаем напоминания
+# Start reminders
 run_schedule(app)
 
-# Запускаем Telegram-бота
+
+# Run Telegram bot
 async def run_bot():
     """Run the Telegram bot."""
     await app.run_polling()
+
 
 asyncio.get_event_loop().run_until_complete(run_bot())
