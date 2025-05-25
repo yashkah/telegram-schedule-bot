@@ -226,33 +226,36 @@ async def reschedule_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 continue
 
 
-
-    # 2. Добавляем новый урок в расписание
+    # 2. Add new lesson to the schedule
     user = update.effective_user
     reschedule_note = f"Rescheduled from {old_date} at {old_time}"
     combined_comment = f"{old_comment} | {reschedule_note}" if old_comment else reschedule_note
 
-    schedule_sheet.append_row([
-    selected_slot["Date"],  # A: Date
-    datetime.strptime(selected_slot["Date"], "%d.%m.%Y").strftime("%A"),  # B: Day
-    selected_slot["Time"],  # C: Time
-    user.first_name,        # D: Student
-    "English",              # E: Subject
-    "60",                   # F: Duration
-    user_id,                # G: Telegram_ID
-    "",                     # H: Level (оставим пустым, можно будет вставлять позже из профиля)
-    combined_comment,       # I: Comments
-    "Online",               # J: Type (пока фиксировано)
-    ""                      # K: Pay (можно задать позже вручную)
-])
+    # Find first empty row
+    next_row = len(schedule_sheet.get_all_values()) + 1
 
-    # 3. Обновляем слот как забронированный
+    # Insert data into specific cells
+    schedule_sheet.update(f"A{next_row}:K{next_row}", [[
+        selected_slot["Date"],
+        datetime.strptime(selected_slot["Date"], "%d.%m.%Y").strftime("%A"),
+        selected_slot["Time"],
+        user.first_name,
+        "English",
+        "60",
+        user_id,
+        "",
+        combined_comment,
+        "Online",
+        ""
+    ]])
+
+    # 3. Update slot as booked
     slots_data = slots_sheet.get_all_records()
     for index, slot in enumerate(slots_data, start=2):
         if slot["Date"] == selected_slot["Date"] and slot["Time"] == selected_slot["Time"]:
             slots_sheet.update(f"C{index}", "TRUE")  # Booked
             slots_sheet.update(f"D{index}", user.first_name)  # Student
-            slots_sheet.update(f"E{index}", user_id)  # Telegram_ID
+            slots_sheet.update(f"E{index}", user_id)  # Telegram ID
             break
 
     await update.message.reply_text(
