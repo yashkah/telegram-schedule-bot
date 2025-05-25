@@ -51,7 +51,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Here’s what I can do for you:\n"
         "▫️ /nextlesson — Show your upcoming lesson\n"
         "▫️ /cancel — Cancel your next class\n"
-        "▫️ /reschedule — Reschedule your class (coming soon)\n"
+        "▫️ /reschedule — Reschedule your class to a different time\n"
         "▫️ /profile — View your profile info\n"
         "💡 Just type one of the commands above or send me a message to interact!"
     )
@@ -116,6 +116,126 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("📭 You don’t have any upcoming lessons to cancel.")
 
+from telegram.ext import ConversationHandler, MessageHandler, filters
+
+RESCHEDULE_SELECT = range(1)
+
+# Сохраняем слоты в память на время выбора
+user_slot_options = {}
+
+async def reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    sheets = connect_to_sheet()
+    slots_sheet = sheets["slots"]
+    schedule_sheet = sheets["schedule"]
+
+    # Получаем ближайший урок
+    data = schedule_sheet.get_all_records()
+    now = datetime.now()
+    upcoming_lesson_row = None
+    for index, row in enumerate(data, start=2):
+        if str(row["Telegram_ID"]) == user_id:
+            try:
+                dt = datetime.strptime(f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M")
+                if dt > now:
+                    upcoming_lesson_row = (index, row)
+                    break
+            except:
+                continue
+
+    if not upcoming_lesson_row:
+        await update.message.reply_text("❌ You don’t have any upcoming lessons to reschedule.")
+        return ConversationHandler.END
+
+    # Получаем свободные слоты
+    slots_data = slots_sheet.get_all_records()
+    available = []
+    for slot in slots_data:
+        if slot["Booked"].strip().upper() != "TRUE":
+            try:
+                dt = datetime.strptime(f"{slot['Date']} {slot['Time']}", "%d.%m.%Y %H:%M")
+                if dt > now:
+                    available.append(slot)
+            except:
+                continue
+
+    if not available:
+        await update.message.reply_text("📭 No available time slots right now.")
+        return ConversationHandler.END
+
+    # Показываем 5 первых слотов
+    top_slots = available[:5]
+    user_slot_options[user_id] = top_slots  # сохраняем для обработки выбора
+
+    message = "🕒 Choose a new time slot by number:\n\n"
+    for i, slot in enumerate(top_slots, start=1):
+        message += f"{i}. {slot['Date']} at {slot['Time']}\n"
+
+    await update.message.reply_text(message)
+    return RESCHEDULE_SELECT
+
+
+async def reschedule_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    user_input = update.message.text.strip()
+
+    if user_id not in user_slot_options:
+        await update.message.reply_text("⚠️ Session expired. Please try /reschedule again.")
+        return ConversationHandler.END
+
+    try:
+        choice = int(user_input)
+        selected_slot = user_slot_options[user_id][choice - 1]
+    except (ValueError, IndexError):
+        await update.message.reply_text("❌ Invalid choice. Please enter a number from the list.")
+        return RESCHEDULE_SELECT
+
+    sheets = connect_to_sheet()
+    slots_sheet = sheets["slots"]
+    schedule_sheet = sheets["schedule"]
+
+    # 1. Удаляем старый урок
+    data = schedule_sheet.get_all_records()
+    for index, row in enumerate(data, start=2):
+        if str(row["Telegram_ID"]) == user_id:
+            try:
+                dt = datetime.strptime(f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M")
+                if dt > datetime.now():
+                    schedule_sheet.delete_rows(index)
+                    break
+            except:
+                continue
+
+    # 2. Добавляем новый урок в расписание
+    user = update.effective_user
+    schedule_sheet.append_row([
+        user.first_name,
+        selected_slot["Date"],
+        selected_slot["Time"],
+        "Rescheduled",
+        "",  # Subject (можно позже уточнить)
+        "",  # Comments
+        "",  # Homework
+        selected_slot["Date"],  # Day (можно переписать)
+        user_id
+    ])
+
+    # 3. Обновляем слот как забронированный
+    slots_data = slots_sheet.get_all_records()
+    for index, slot in enumerate(slots_data, start=2):
+        if slot["Date"] == selected_slot["Date"] and slot["Time"] == selected_slot["Time"]:
+            slots_sheet.update(f"C{index}", "TRUE")  # Booked
+            slots_sheet.update(f"D{index}", user.first_name)  # Student
+            slots_sheet.update(f"E{index}", user_id)  # Telegram_ID
+            break
+
+    await update.message.reply_text(
+        f"✅ Your lesson was rescheduled to:\n🗓️ {selected_slot['Date']} ⏰ {selected_slot['Time']}"
+    )
+
+    user_slot_options.pop(user_id, None)  # очистка
+    return ConversationHandler.END
+
 
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -163,6 +283,12 @@ app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("nextlesson", nextlesson))
 app.add_handler(CommandHandler("profile", profile))
 app.add_handler(CommandHandler("cancel", cancel))
+app.add_handler(ConversationHandler(
+    entry_points=[CommandHandler("reschedule", reschedule)],
+    states={RESCHEDULE_SELECT: [MessageHandler(filters.TEXT & (~filters.COMMAND), reschedule_select)]},
+    fallbacks=[]
+))
+
 
 from telegram.ext import MessageHandler, filters
 
