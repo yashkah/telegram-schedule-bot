@@ -46,7 +46,18 @@ def save_user_to_users_sheet(name, username, telegram_id, timestamp):
 
 # /start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Hello! Send /nextlesson to see your upcoming class 📚")
+    welcome_message = (
+        "👋 *Hello! I'm your personal lesson assistant bot!*\n\n"
+        "Here’s what I can do for you:\n"
+        "▫️ `/nextlesson` — Show your upcoming lesson\n"
+        "▫️ `/cancel` — Cancel your next class (coming soon)\n"
+        "▫️ `/reschedule` — Reschedule your class (coming soon)\n"
+        "▫️ `/profile` — View your profile info (coming soon)\n\n"
+        "💡 Just type one of the commands above or send me a message to interact!"
+    )
+    
+    await update.message.reply_text(welcome_message, parse_mode='Markdown')
+
 
 # /nextlesson command
 async def nextlesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
