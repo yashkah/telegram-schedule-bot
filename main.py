@@ -49,10 +49,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_message = (
         "👋 *Hello! I'm your personal lesson assistant bot!*\n\n"
         "Here’s what I can do for you:\n"
-        "▫️ `/nextlesson` — Show your upcoming lesson\n"
-        "▫️ `/cancel` — Cancel your next class (coming soon)\n"
-        "▫️ `/reschedule` — Reschedule your class (coming soon)\n"
-        "▫️ `/profile` — View your profile info (coming soon)\n\n"
+        "▫️ /nextlesson — Show your upcoming lesson\n"
+        "▫️ /cancel — Cancel your next class (coming soon)\n"
+        "▫️ /reschedule — Reschedule your class (coming soon)\n"
+        "▫️ /profile — View your profile info (coming soon)\n\n"
         "💡 Just type one of the commands above or send me a message to interact!"
     )
     
