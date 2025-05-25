@@ -1,13 +1,24 @@
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-from sheets import connect_to_sheet
-from datetime import datetime
+"""
+English lesson scheduling Telegram bot.
+Handles lesson management and user notifications.
+"""
+
 import asyncio
-
-from flask import Flask
+import os
+import schedule
 import threading
+import time
+from datetime import datetime
 
-# Фейковый веб-сервер для Render
+import nest_asyncio
+from flask import Flask
+from telegram import Update
+from telegram.ext import (ApplicationBuilder, CommandHandler, ContextTypes,
+                         ConversationHandler, MessageHandler, filters)
+
+from sheets import connect_to_sheet
+
+# Flask server for Render hosting
 fake_app = Flask(__name__)
 
 @fake_app.route('/')
@@ -17,13 +28,12 @@ def home():
 
 # Запускаем Flask в отдельном потоке
 def run_flask():
-    import os
-    port = int(os.environ.get("PORT", 10000))  # Render сам подставит переменную PORT
+    """Run Flask server in separate thread."""
+    port = int(os.environ.get("PORT", 10000))
     fake_app.run(host="0.0.0.0", port=port)
 
 # Запуск потока Flask
 threading.Thread(target=run_flask).start()
-
 
 already_notified = set()
 
@@ -31,6 +41,7 @@ already_notified = set()
 sheet = connect_to_sheet()
 
 def save_user_to_users_sheet(name, username, telegram_id, timestamp):
+    """Save new user info to Users worksheet."""
     sheets = connect_to_sheet()
     users_sheet = sheets["users"]
     data = users_sheet.get_all_records()
@@ -46,21 +57,22 @@ def save_user_to_users_sheet(name, username, telegram_id, timestamp):
 
 # /start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /start command."""
     welcome_message = (
         "👋 *Hello! I'm your personal lesson assistant bot!*\n\n"
-        "Here’s what I can do for you:\n"
+        "Here's what I can do for you:\n"
         "▫️ /nextlesson — Show your upcoming lesson\n"
         "▫️ /cancel — Cancel your next class\n"
         "▫️ /reschedule — Reschedule your class to a different time\n"
         "▫️ /profile — View your profile info\n"
         "💡 Just type one of the commands above or send me a message to interact!"
     )
-    
     await update.message.reply_text(welcome_message, parse_mode='Markdown')
 
 
 # /nextlesson command
 async def nextlesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show user's next scheduled lesson."""
     user_id = str(update.effective_user.id)
     now = datetime.now()
 
@@ -75,22 +87,24 @@ async def nextlesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except ValueError:
                 try:
                     dt = datetime.strptime(f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M")
-                except:
+                except ValueError:
                     continue
 
             if dt > now:
                 message = (
-                     f"📅 Your next lesson:\n\n"
-                     f"🗓️ Date: {row['Day']}, {row['Date']}\n"
-                     f"⏰ Time: {row['Time']}\n"
-                     f"📚 Subject: {row['Subject']}"
+                    f"📅 Your next lesson:\n\n"
+                    f"🗓️ Date: {row['Day']}, {row['Date']}\n"
+                    f"⏰ Time: {row['Time']}\n"
+                    f"📚 Subject: {row['Subject']}"
                 )
                 await update.message.reply_text(message)
                 return
 
     await update.message.reply_text("You don't have any upcoming lessons 🤷")
 
+# /cancel command
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cancel user's next scheduled lesson."""
     user_id = str(update.effective_user.id)
     now = datetime.now()
 
@@ -98,11 +112,11 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     schedule_sheet = sheets["schedule"]
     data = schedule_sheet.get_all_records()
 
-    for index, row in enumerate(data, start=2):  # начинаем с 2, т.к. первая строка — заголовок
+    for index, row in enumerate(data, start=2):
         if str(row["Telegram_ID"]) == user_id:
             try:
                 dt = datetime.strptime(f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M")
-            except:
+            except ValueError:
                 continue
 
             if dt > now:
@@ -114,9 +128,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
 
-    await update.message.reply_text("📭 You don’t have any upcoming lessons to cancel.")
-
-from telegram.ext import ConversationHandler, MessageHandler, filters
+    await update.message.reply_text("📭 You don't have any upcoming lessons to cancel.")
 
 RESCHEDULE_SELECT = range(1)
 
@@ -124,6 +136,7 @@ RESCHEDULE_SELECT = range(1)
 user_slot_options = {}
 
 async def reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Start lesson rescheduling process."""
     user_id = str(update.effective_user.id)
     sheets = connect_to_sheet()
     slots_sheet = sheets["slots"]
@@ -133,6 +146,7 @@ async def reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = schedule_sheet.get_all_records()
     now = datetime.now()
     upcoming_lesson_row = None
+
     for index, row in enumerate(data, start=2):
         if str(row["Telegram_ID"]) == user_id:
             try:
@@ -140,11 +154,11 @@ async def reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if dt > now:
                     upcoming_lesson_row = (index, row)
                     break
-            except:
+            except ValueError:
                 continue
 
     if not upcoming_lesson_row:
-        await update.message.reply_text("❌ You don’t have any upcoming lessons to reschedule.")
+        await update.message.reply_text("❌ You don't have any upcoming lessons to reschedule.")
         return ConversationHandler.END
 
     # Получаем свободные слоты
@@ -156,7 +170,7 @@ async def reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 dt = datetime.strptime(f"{slot['Date']} {slot['Time']}", "%d.%m.%Y %H:%M")
                 if dt > now:
                     available.append(slot)
-            except:
+            except ValueError:
                 continue
 
     if not available:
@@ -174,8 +188,8 @@ async def reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(message)
     return RESCHEDULE_SELECT
 
-
 async def reschedule_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle time slot selection for rescheduling."""
     user_id = str(update.effective_user.id)
     user_input = update.message.text.strip()
 
@@ -196,29 +210,41 @@ async def reschedule_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 1. Удаляем старый урок
     data = schedule_sheet.get_all_records()
+    old_date = old_time = old_comment = ""
+    
     for index, row in enumerate(data, start=2):
         if str(row["Telegram_ID"]) == user_id:
             try:
                 dt = datetime.strptime(f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M")
                 if dt > datetime.now():
+                    old_date = row["Date"]
+                    old_time = row["Time"]
+                    old_comment = row.get("Comments", "").strip() or ""
                     schedule_sheet.delete_rows(index)
                     break
-            except:
+            except ValueError:
                 continue
+
+
 
     # 2. Добавляем новый урок в расписание
     user = update.effective_user
+    reschedule_note = f"Rescheduled from {old_date} at {old_time}"
+    combined_comment = f"{old_comment} | {reschedule_note}" if old_comment else reschedule_note
+
     schedule_sheet.append_row([
-        user.first_name,
-        selected_slot["Date"],
-        selected_slot["Time"],
-        "Rescheduled",
-        "",  # Subject (можно позже уточнить)
-        "",  # Comments
-        "",  # Homework
-        selected_slot["Date"],  # Day (можно переписать)
-        user_id
-    ])
+    selected_slot["Date"],  # A: Date
+    datetime.strptime(selected_slot["Date"], "%d.%m.%Y").strftime("%A"),  # B: Day
+    selected_slot["Time"],  # C: Time
+    user.first_name,        # D: Student
+    "English",              # E: Subject
+    "60",                   # F: Duration
+    user_id,                # G: Telegram_ID
+    "",                     # H: Level (оставим пустым, можно будет вставлять позже из профиля)
+    combined_comment,       # I: Comments
+    "Online",               # J: Type (пока фиксировано)
+    ""                      # K: Pay (можно задать позже вручную)
+])
 
     # 3. Обновляем слот как забронированный
     slots_data = slots_sheet.get_all_records()
@@ -233,11 +259,11 @@ async def reschedule_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"✅ Your lesson was rescheduled to:\n🗓️ {selected_slot['Date']} ⏰ {selected_slot['Time']}"
     )
 
-    user_slot_options.pop(user_id, None)  # очистка
+    user_slot_options.pop(user_id, None)
     return ConversationHandler.END
 
-
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show user profile information."""
     user_id = str(update.effective_user.id)
     sheets = connect_to_sheet()
     users_sheet = sheets["users"]
@@ -274,9 +300,7 @@ try:
     load_dotenv()
     TOKEN = os.getenv("BOT_TOKEN")
 except ImportError:
-    # If dotenv is not available, use os.environ directly
     TOKEN = os.environ["BOT_TOKEN"]
-
 
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
@@ -289,34 +313,29 @@ app.add_handler(ConversationHandler(
     fallbacks=[]
 ))
 
-
-from telegram.ext import MessageHandler, filters
-
 async def log_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Log user messages and save new users."""
     user = update.effective_user
     message = update.message.text
 
     name = f"{user.first_name or ''} {user.last_name or ''}".strip()
     username = user.username or "-"
     user_id = user.id
-    timestamp = datetime.now().strftime("%Y.%m.%d")  
+    timestamp = datetime.now().strftime("%Y.%m.%d")
 
     print(f"💬 Message from {name} (@{username}, ID: {user_id}) at {timestamp}: {message}")
-
     save_user_to_users_sheet(name, username, user_id, timestamp)
 
 app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), log_message))
 
-import schedule
-import time
-import threading
-
 async def send_reminders(application):
+    """Send lesson reminders to users."""
     now = datetime.now()
     sheets = connect_to_sheet()
     schedule_sheet = sheets["schedule"]
     data = schedule_sheet.get_all_records()
 
+    REMINDER_BEFORE_MINUTES = 60
 
     for row in data:
         print(f"🧪 Checking row for student: {row['Student']} | Date: {row['Date']} | Time: {row['Time']}")
@@ -325,19 +344,17 @@ async def send_reminders(application):
         if lesson_key in already_notified:
             print(f"⚠️ Already notified for: {lesson_key}")
             continue
+
         try:
             dt = datetime.strptime(f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M")
             if dt < now:
                 continue
-
-        except:
+        except ValueError:
             print("⚠️ Could not parse datetime.")
             continue
 
         time_diff = (dt - now).total_seconds() / 60
         print(f"⏳ Time diff with now: {time_diff:.2f} minutes")
-
-        REMINDER_BEFORE_MINUTES = 60
 
         if REMINDER_BEFORE_MINUTES - 0.5 <= time_diff <= REMINDER_BEFORE_MINUTES + 0.5:
             print(f"✅ Sending reminder to: {row['Student']}")
@@ -347,7 +364,7 @@ async def send_reminders(application):
                 f"📅 Date: {row['Day']}, {row['Date']}\n"
                 f"⏰ Time: {row['Time']}\n"
                 f"📚 Subject: {row['Subject']}"
-)
+            )
 
             try:
                 await application.bot.send_message(chat_id=user_id, text=message)
@@ -356,6 +373,7 @@ async def send_reminders(application):
                 print(f"❌ Failed to send message to {user_id}: {e}")
 
 def run_schedule(application):
+    """Run scheduled reminder checks."""
     async def task():
         await send_reminders(application)
 
@@ -369,7 +387,6 @@ def run_schedule(application):
     thread.daemon = True
     thread.start()
 
-import nest_asyncio
 nest_asyncio.apply()
 
 print("Bot is starting...")
@@ -379,6 +396,7 @@ run_schedule(app)
 
 # Запускаем Telegram-бота
 async def run_bot():
+    """Run the Telegram bot."""
     await app.run_polling()
 
 asyncio.get_event_loop().run_until_complete(run_bot())
