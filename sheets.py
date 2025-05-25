@@ -5,17 +5,14 @@ def connect_to_sheet():
     scope = ["https://spreadsheets.google.com/feeds", 
              "https://www.googleapis.com/auth/spreadsheets",
              "https://www.googleapis.com/auth/drive"]
-    
+
     creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
     client = gspread.authorize(creds)
 
-    # Подключаемся к таблице по названию
-    sheet = client.open("English Schedule").sheet1
-    return sheet
+    # Открываем таблицу по названию
+    spreadsheet = client.open("English Schedule")
 
-if __name__ == "__main__":
-    sheet = connect_to_sheet()
-    data = sheet.get_all_records()
-
-    for row in data:
-        print(row)
+    return {
+        "schedule": spreadsheet.worksheet("May 25"),  # Название листа с занятиями
+        "users": spreadsheet.worksheet("Users")         # Название листа для студентов
+    }

@@ -30,6 +30,20 @@ already_notified = set()
 # Connect to Google Sheet
 sheet = connect_to_sheet()
 
+def save_user_to_users_sheet(name, username, telegram_id, timestamp):
+    sheets = connect_to_sheet()
+    users_sheet = sheets["users"]
+    data = users_sheet.get_all_records()
+
+    existing_ids = [str(row["Telegram ID"]) for row in data]
+
+    if str(telegram_id) not in existing_ids:
+        users_sheet.append_row([name, username, telegram_id, timestamp])
+        print(f"✅ New user saved: {name} (ID: {telegram_id})")
+    else:
+        print(f"👀 User already exists: {telegram_id}")
+
+
 # /start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Hello! Send /nextlesson to see your upcoming class 📚")
@@ -79,6 +93,26 @@ except ImportError:
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("nextlesson", nextlesson))
+
+from telegram.ext import MessageHandler, filters
+
+async def log_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    message = update.message.text
+
+    name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+    username = user.username or "-"
+    user_id = user.id
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    print(f"💬 Message from {name} (@{username}, ID: {user_id}) at {timestamp}: {message}")
+
+    # Save to Google Sheets if not already saved
+    save_user_to_users_sheet(name, username, user_id, timestamp)
+
+# Attach this to the bot
+app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), log_message))
+
 
 import schedule
 import time
