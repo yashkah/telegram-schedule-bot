@@ -3,6 +3,9 @@ Reminder functionality for English lessons.
 """
 
 import asyncio
+import schedule
+import threading
+import time
 from datetime import datetime, timedelta
 import pytz
 from telegram.ext import Application
@@ -47,10 +50,15 @@ async def send_reminders(app: Application):
             continue
 
 def run_schedule(app: Application):
-    """Run the reminder schedule."""
-    async def check_reminders():
+    """Run the reminder schedule using a thread-based scheduler."""
+    def loop():
         while True:
-            await send_reminders(app)
-            await asyncio.sleep(300)  # Check every 5 minutes
+            schedule.run_pending()
+            time.sleep(1)
 
-    asyncio.create_task(check_reminders()) 
+    def task():
+        schedule.every(1).minutes.do(lambda: asyncio.run(send_reminders(app)))
+        threading.Thread(target=loop, daemon=True).start()
+
+    print("📅 Reminder scheduler started.")
+    task() 
