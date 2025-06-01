@@ -22,6 +22,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "▫️ /nextlesson — Show your upcoming lesson\n"
         "▫️ /cancel — Cancel your next class\n"
         "▫️ /reschedule — Reschedule your class to a different time\n"
+        "▫️ /book — Book a new lesson\n"
         "▫️ /profile — View your profile info\n"
         "💡 Just type one of the commands above or send me a message to interact!"
     )
