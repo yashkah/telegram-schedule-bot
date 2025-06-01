@@ -7,6 +7,8 @@ from telegram import Update
 from telegram.ext import ConversationHandler, ContextTypes
 
 from telegram_bot.sheets.google import connect_to_sheet
+from telegram_bot.bot.sync import sync_schedule_with_slots
+from telegram_bot.bot.utils import notify_admin_command_usage
 
 # Conversation states
 RESCHEDULE_SELECT = range(1)
@@ -16,6 +18,7 @@ user_slot_options = {}
 
 async def reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start lesson rescheduling process."""
+    await notify_admin_command_usage(context, update, "reschedule")
     user_id = str(update.effective_user.id)
     sheets = connect_to_sheet()
     slots_sheet = sheets["slots"]

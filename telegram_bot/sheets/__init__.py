@@ -1,3 +1,3 @@
 """
-Sheets module for Google Sheets integration.
+Google Sheets integration module.
 """ 

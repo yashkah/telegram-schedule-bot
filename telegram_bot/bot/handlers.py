@@ -7,7 +7,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from telegram_bot.sheets.google import connect_to_sheet
-from telegram_bot.bot.utils import save_user_to_users_sheet
+from telegram_bot.bot.utils import save_user_to_users_sheet, notify_admin_command_usage
 
 # Admin Telegram ID
 ADMIN_ID = 6878992518
@@ -15,6 +15,7 @@ ADMIN_ID = 6878992518
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command."""
+    await notify_admin_command_usage(context, update, "start")
     welcome_message = (
         "👋 *Hello! I'm your personal lesson assistant bot!*\n\n"
         "Here's what I can do for you:\n"
@@ -29,6 +30,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def nextlesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show user's next lesson."""
+    await notify_admin_command_usage(context, update, "nextlesson")
     user_id = str(update.effective_user.id)
     now = datetime.now()
 
@@ -67,6 +69,7 @@ async def nextlesson(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancel user's next scheduled lesson."""
+    await notify_admin_command_usage(context, update, "cancel")
     user_id = str(update.effective_user.id)
     now = datetime.now()
 
@@ -97,6 +100,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show user profile information."""
+    await notify_admin_command_usage(context, update, "profile")
     user_id = str(update.effective_user.id)
     sheets = connect_to_sheet()
     users_sheet = sheets["users"]
@@ -126,6 +130,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def log_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Log user messages and save new users."""
+    # No need to notify for regular messages
     user = update.effective_user
     message = update.message.text
 
@@ -135,20 +140,4 @@ async def log_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     timestamp = datetime.now().strftime("%Y.%m.%d")
 
     print(f"💬 Message from {name} (@{username}, ID: {user_id}) at {timestamp}: {message}")
-    save_user_to_users_sheet(name, username, user_id, timestamp)
-
-    if user_id != ADMIN_ID:  # Don't send to self
-        notify_text = (
-            f"📨 *New message from student:*\n"
-            f"👤 Name: {name}\n"
-            f"💬 Username: @{username}\n"
-            f"🆔 ID: {user_id}\n"
-            f"🕒 Time: {timestamp}\n\n"
-            f"✉️ Message:\n{message}"
-        )
-        try:
-            await context.bot.send_message(
-                chat_id=ADMIN_ID, text=notify_text, parse_mode="Markdown"
-            )
-        except Exception as e:
-            print(f"❌ Failed to notify admin: {e}") 
+    save_user_to_users_sheet(name, username, user_id, timestamp) 

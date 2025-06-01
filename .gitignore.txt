@@ -1,8 +1,0 @@
-__pycache__/
-*.pyc
-*.log
-env/
-.idea/
-.vscode/
-node_modules/
-*.db

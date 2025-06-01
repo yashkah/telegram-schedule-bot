@@ -25,6 +25,7 @@ from telegram_bot.bot.handlers import (
     log_message,
 )
 from telegram_bot.bot.reschedule import reschedule, reschedule_select, RESCHEDULE_SELECT
+from telegram_bot.bot.book import book_class, select_slot, SELECT_SLOT
 from telegram_bot.bot.reminders import run_schedule
 
 # Flask server for Render hosting
@@ -53,16 +54,16 @@ except ImportError:
 def main():
     """Initialize and run the bot."""
     # Initialize the bot
-    app_builder = ApplicationBuilder().token(TOKEN).build()
+    application = ApplicationBuilder().token(TOKEN).build()
     
     # Register command handlers
-    app_builder.add_handler(CommandHandler("start", start))
-    app_builder.add_handler(CommandHandler("nextlesson", nextlesson))
-    app_builder.add_handler(CommandHandler("profile", profile))
-    app_builder.add_handler(CommandHandler("cancel", cancel))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("nextlesson", nextlesson))
+    application.add_handler(CommandHandler("profile", profile))
+    application.add_handler(CommandHandler("cancel", cancel))
     
     # Register conversation handler for reschedule
-    app_builder.add_handler(
+    application.add_handler(
         ConversationHandler(
             entry_points=[CommandHandler("reschedule", reschedule)],
             states={
@@ -74,17 +75,30 @@ def main():
         )
     )
     
-    # Register message handler
-    app_builder.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), log_message))
+    # Register conversation handler for booking
+    application.add_handler(
+        ConversationHandler(
+            entry_points=[CommandHandler("book", book_class)],
+            states={
+                SELECT_SLOT: [
+                    MessageHandler(filters.TEXT & (~filters.COMMAND), select_slot)
+                ]
+            },
+            fallbacks=[],
+        )
+    )
     
-    # Start reminders
-    run_schedule(app_builder)
+    # Register message handler
+    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), log_message))
     
     print("Bot is starting...")
     
+    # Start reminders
+    run_schedule(application)
+    
     # Run the bot
     nest_asyncio.apply()
-    return app_builder
+    return application
 
 if __name__ == "__main__":
     app = main()

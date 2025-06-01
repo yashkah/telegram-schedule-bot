@@ -1,3 +1,3 @@
 """
-Bot package for Telegram English lesson scheduling bot.
+Bot module containing command handlers and utilities.
 """ 
