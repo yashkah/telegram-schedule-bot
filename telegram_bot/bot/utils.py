@@ -44,8 +44,8 @@ async def notify_admin_command_usage(
         return
         
     user = update.effective_user
-    moscow_tz = pytz.timezone('Europe/Moscow')
-    timestamp = datetime.now(moscow_tz).strftime("%d.%m.%Y %H:%M:%S")
+    warsaw_tz = pytz.timezone('Europe/Warsaw')
+    timestamp = datetime.now(warsaw_tz).strftime("%d.%m.%Y %H:%M:%S")
     
     message = (
         f"🔔 *Command Used*\n\n"

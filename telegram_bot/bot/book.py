@@ -21,7 +21,7 @@ async def book_class(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start the lesson booking process."""
     await notify_admin_command_usage(context, update, "book")
     user_id = str(update.effective_user.id)
-    now = datetime.now(pytz.timezone('Europe/Moscow'))
+    now = datetime.now(pytz.timezone('Europe/Warsaw'))
     
     # Sync schedule with slots first
     try:
@@ -43,7 +43,7 @@ async def book_class(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if str(row["Telegram_ID"]) == user_id:
             try:
                 dt = datetime.strptime(f"{row['Date']} {row['Time']}", "%d.%m.%Y %H:%M")
-                dt = pytz.timezone('Europe/Moscow').localize(dt)
+                dt = pytz.timezone('Europe/Warsaw').localize(dt)
                 if dt > now:
                     await update.message.reply_text(
                         "❌ You already have an upcoming lesson. Please use /reschedule if you want to change it."
@@ -61,7 +61,7 @@ async def book_class(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if slot["Booked"].strip().upper() != "TRUE":
             try:
                 dt = datetime.strptime(f"{slot['Date']} {slot['Time']}", "%d.%m.%Y %H:%M")
-                dt = pytz.timezone('Europe/Moscow').localize(dt)
+                dt = pytz.timezone('Europe/Warsaw').localize(dt)
                 if dt > now:
                     available.append(slot)
             except ValueError:
