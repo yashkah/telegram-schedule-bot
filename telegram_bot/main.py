@@ -26,7 +26,6 @@ from telegram_bot.bot.handlers import (
 )
 from telegram_bot.bot.reschedule import reschedule, reschedule_select, RESCHEDULE_SELECT
 from telegram_bot.bot.book import book_class, select_slot, SELECT_SLOT
-from telegram_bot.bot.reminders import run_schedule
 
 # Flask server for Render hosting
 app = Flask(__name__)
@@ -92,9 +91,6 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), log_message))
     
     print("Bot is starting...")
-    
-    # Start reminders
-    run_schedule(application)
     
     # Run the bot
     nest_asyncio.apply()
